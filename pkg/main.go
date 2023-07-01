@@ -205,11 +205,11 @@ func (h *structKafka) ConsumerRpc(topic, groupId string, overwriteResponse *Cons
 			break
 		}
 
-		if string(message.Key) == h.corellationId {
-			log.Println("SERVER CONSUMER RPC CORRELATION ID: ", h.corellationId)
-			log.Println("SERVER CONSUMER RPC REPLY TO: ", h.replyTo)
-			log.Println("SERVER CONSUMER RPC BODY: ", string(message.Value))
+		log.Println("SERVER CONSUMER RPC CORRELATION ID: ", h.corellationId)
+		log.Println("SERVER CONSUMER RPC REPLY TO: ", h.replyTo)
+		log.Println("SERVER CONSUMER RPC BODY: ", string(message.Value))
 
+		if string(message.Key) == h.corellationId {
 			if overwriteResponse != nil {
 				bodyByte, err := json.Marshal(&overwriteResponse.Res)
 				if err != nil {
