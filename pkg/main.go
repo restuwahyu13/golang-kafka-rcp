@@ -108,10 +108,10 @@ func (h *structKafka) listeningConsumer(metadata *publishMetadata, isMatchChan c
 func (h *structKafka) listeningConsumerRpc(isMatchChan chan bool, messageChan chan kafka.Message, message kafka.Message, metadata *publishMetadata) {
 	log.Println("CLIENT CONSUMER RPC BODY: ", string(message.Value))
 
-	for _, d := range publishRequests {
+	for _, v := range publishRequests {
 		select {
 		case ok := <-isMatchChan:
-			if ok && d.CorrelationId == metadata.CorrelationId {
+			if ok && v.CorrelationId == metadata.CorrelationId {
 				messageChan <- message
 			} else {
 				messageChan <- kafka.Message{}
@@ -126,6 +126,7 @@ func (h *structKafka) PublishRpc(topic string, body interface{}) chan kafka.Mess
 	broker := kafka.Writer{
 		Addr:                   kafka.TCP(brokers...),
 		Topic:                  topic,
+		Compression:            kafka.Snappy,
 		AllowAutoTopicCreation: true,
 	}
 
