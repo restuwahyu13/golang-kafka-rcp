@@ -74,6 +74,7 @@ func main() {
  if err != nil {
   log.Fatal(err.Error())
  }
+
  fmt.Println("RPC Result: ", string(message.Value))
 }
 ```
