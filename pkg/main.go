@@ -5,11 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
 	"sync"
-	"syscall"
-	"time"
 
 	"github.com/lithammer/shortuuid"
 	"github.com/segmentio/kafka-go"
@@ -244,20 +240,6 @@ func (h *structKafka) ConsumerRpc(topic, groupId string, overwriteResponse *Cons
 					return
 				}
 			}
-		}
-
-		signalChan := make(chan os.Signal, 1)
-		signal.Notify(signalChan, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGALRM)
-
-		select {
-		case sigs := <-signalChan:
-			log.Printf("Received Signal %s", sigs.String())
-			os.Exit(15)
-			break
-		default:
-			time.Sleep(time.Duration(time.Second * 3))
-			log.Println("...........................")
-			break
 		}
 	}
 }
