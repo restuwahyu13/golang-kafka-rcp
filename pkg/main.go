@@ -59,7 +59,7 @@ func (h *structKafka) listeningConsumer(metadata *publishMetadata, isMatchChan c
 		Brokers:               brokers,
 		GroupID:               metadata.CorrelationId,
 		Topic:                 metadata.ReplyTo,
-		MaxAttempts:           5,
+		MaxAttempts:           retryCon,
 		WatchPartitionChanges: true,
 	})
 
