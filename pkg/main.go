@@ -164,9 +164,8 @@ func (h *structKafka) PublishRpc(topic string, body interface{}) (*kafka.Message
 	}
 
 	res := <-messageChan
-	h.replyTo = fmt.Sprintf("rpc.%s", res.Key)
 
-	defer h.DeleteTopicRpc(h.replyTo)
+	defer h.DeleteTopicRpc(fmt.Sprintf("rpc.%s", res.Key))
 	return &res, nil
 }
 
@@ -264,8 +263,15 @@ func (h *structKafka) ConsumerRpc(topic, groupId string, overwriteResponse *Cons
 }
 
 func (h *structKafka) DeleteTopicRpc(topic string) {
+	log.Println("DELETED TOPIC RPC: ", topic)
+
 	for _, v := range brokers {
-		broker, _ := kafka.Dial(network, v)
+		broker, err := kafka.Dial(network, v)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+
 		broker.DeleteTopics(topic)
 	}
 }

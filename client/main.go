@@ -37,5 +37,5 @@ func main() {
 		log.Fatal(err.Error())
 	}
 
-	fmt.Println("RPC Result: ", string(message.Value))
+	fmt.Println(string(message.Value))
 }
