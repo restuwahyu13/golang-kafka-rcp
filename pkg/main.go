@@ -16,7 +16,7 @@ type InterfaceKafka interface {
 	listeningConsumer(metadata *publishMetadata, isMatchChan chan bool, messageChan chan kafka.Message)
 	listeningConsumerRpc(isMatchChan chan bool, messageChan chan kafka.Message, message kafka.Message, metadata *publishMetadata)
 	PublishRpc(topic string, body interface{}) (*kafka.Message, error)
-	ConsumerRpc(topic, groupId string, overwriteResponse *ConsumerOverwriteResponse)
+	ConsumerRpc(topic, groupId string, handler func(message kafka.Message) ([]byte, error))
 	DeleteTopicRpc(topic string)
 }
 
@@ -34,7 +34,6 @@ type structKafka struct {
 	topic         string
 	corellationId string
 	replyTo       string
-	value         []byte
 }
 
 var (
@@ -165,7 +164,7 @@ func (h *structKafka) PublishRpc(topic string, body interface{}) (*kafka.Message
 	return &res, nil
 }
 
-func (h *structKafka) ConsumerRpc(topic, groupId string, overwriteResponse *ConsumerOverwriteResponse) {
+func (h *structKafka) ConsumerRpc(topic, groupId string, handler func(message kafka.Message) ([]byte, error)) {
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:               brokers,
 		Topic:                 topic,
@@ -178,12 +177,10 @@ func (h *structKafka) ConsumerRpc(topic, groupId string, overwriteResponse *Cons
 		message, err := reader.FetchMessage(h.ctx)
 		if err != nil {
 			log.Fatal(err.Error())
-			return
 		}
 
 		if err := reader.CommitMessages(h.ctx, message); err != nil {
 			log.Fatal(err.Error())
-			return
 		}
 
 		for _, v := range message.Headers {
@@ -205,23 +202,15 @@ func (h *structKafka) ConsumerRpc(topic, groupId string, overwriteResponse *Cons
 		log.Println("SERVER CONSUMER RPC BODY: ", string(message.Value))
 
 		if string(message.Key) == h.corellationId {
-			if overwriteResponse != nil {
-				bodyByte, err := json.Marshal(&overwriteResponse.Res)
-				if err != nil {
-					log.Fatal(err.Error())
-					return
-				}
-
-				h.value = bodyByte
-			} else {
-				h.value = message.Value
+			res, err := handler(message)
+			if err != nil {
+				log.Fatal(err.Error())
 			}
 
 			for _, v := range brokers {
 				broker, err := kafka.DialLeader(h.ctx, network, v, h.replyTo, message.Partition)
 				if err != nil {
-					log.Fatal(err)
-					return
+					log.Fatal(err.Error())
 				}
 
 				headers := []protocol.Header{
@@ -231,13 +220,12 @@ func (h *structKafka) ConsumerRpc(topic, groupId string, overwriteResponse *Cons
 
 				msg := kafka.Message{
 					Key:     []byte(h.corellationId),
-					Value:   h.value,
+					Value:   res,
 					Headers: headers,
 				}
 
 				if _, err := broker.WriteCompressedMessages(kafka.Snappy.Codec(), msg); err != nil {
-					log.Fatal(err)
-					return
+					log.Fatal(err.Error())
 				}
 			}
 		}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"os"
 	"os/signal"
@@ -11,6 +12,7 @@ import (
 	"github.com/jaswdr/faker"
 	"github.com/lithammer/shortuuid"
 	"github.com/restuwahyu13/go-kafka-rpc/pkg"
+	"github.com/segmentio/kafka-go"
 )
 
 type Person struct {
@@ -27,19 +29,23 @@ func main() {
 		groupId string             = "account-groupId"
 		broker  pkg.InterfaceKafka = pkg.NewKafka(context.Background())
 		fk      faker.Faker        = faker.New()
-		data    Person             = Person{}
+		person  Person             = Person{}
 	)
 
-	data.ID = shortuuid.New()
-	data.Name = fk.App().Name()
-	data.Country = fk.Address().Country()
-	data.City = fk.Address().City()
-	data.PostCode = fk.Address().PostCode()
+	go broker.ConsumerRpc(topic, groupId, func(message kafka.Message) ([]byte, error) {
+		person.ID = shortuuid.New()
+		person.Name = fk.App().Name()
+		person.Country = fk.Address().Country()
+		person.City = fk.Address().City()
+		person.PostCode = fk.Address().PostCode()
 
-	replyTo := pkg.ConsumerOverwriteResponse{}
-	replyTo.Res = data
+		personByte, err := json.Marshal(&person)
+		if err != nil {
+			return nil, err
+		}
 
-	go broker.ConsumerRpc(topic, groupId, &replyTo)
+		return personByte, nil
+	})
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGALRM)
