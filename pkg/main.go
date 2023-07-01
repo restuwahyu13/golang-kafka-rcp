@@ -164,7 +164,6 @@ func (h *structKafka) PublishRpc(topic string, body interface{}) chan kafka.Mess
 		return messageChan
 	}
 
-	defer time.Sleep(time.Second * 2)
 	return messageChan
 }
 
