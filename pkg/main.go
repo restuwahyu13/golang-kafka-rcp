@@ -19,7 +19,7 @@ import (
 type InterfaceKafka interface {
 	listeningConsumer(metadata *publishMetadata, isMatchChan chan bool, messageChan chan kafka.Message)
 	listeningConsumerRpc(isMatchChan chan bool, messageChan chan kafka.Message, message kafka.Message, metadata *publishMetadata)
-	PublishRpc(topic string, body interface{}) chan kafka.Message
+	PublishRpc(topic string, body interface{}) (*kafka.Message, error)
 	ConsumerRpc(topic, groupId string, overwriteResponse *ConsumerOverwriteResponse)
 	DeleteTopicRpc(topic string)
 }
@@ -122,7 +122,7 @@ func (h *structKafka) listeningConsumerRpc(isMatchChan chan bool, messageChan ch
 	}
 }
 
-func (h *structKafka) PublishRpc(topic string, body interface{}) chan kafka.Message {
+func (h *structKafka) PublishRpc(topic string, body interface{}) (*kafka.Message, error) {
 	broker := kafka.Writer{
 		Addr:                   kafka.TCP(brokers...),
 		Topic:                  topic,
@@ -145,8 +145,7 @@ func (h *structKafka) PublishRpc(topic string, body interface{}) chan kafka.Mess
 
 	bodyByte, err := json.Marshal(&body)
 	if err != nil {
-		log.Fatal(err.Error())
-		return messageChan
+		return nil, err
 	}
 
 	headers := []protocol.Header{
@@ -161,11 +160,14 @@ func (h *structKafka) PublishRpc(topic string, body interface{}) chan kafka.Mess
 	}
 
 	if err := broker.WriteMessages(h.ctx, msg); err != nil {
-		log.Fatal(err.Error())
-		return messageChan
+		return nil, err
 	}
 
-	return messageChan
+	res := <-messageChan
+	h.replyTo = fmt.Sprintf("rpc.%s", res.Key)
+
+	defer h.DeleteTopicRpc(h.replyTo)
+	return &res, nil
 }
 
 func (h *structKafka) ConsumerRpc(topic, groupId string, overwriteResponse *ConsumerOverwriteResponse) {
@@ -178,9 +180,14 @@ func (h *structKafka) ConsumerRpc(topic, groupId string, overwriteResponse *Cons
 	})
 
 	for {
-		message, err := reader.ReadMessage(context.Background())
+		message, err := reader.FetchMessage(h.ctx)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal(err.Error())
+			return
+		}
+
+		if err := reader.CommitMessages(h.ctx, message); err != nil {
+			log.Fatal(err.Error())
 			return
 		}
 
