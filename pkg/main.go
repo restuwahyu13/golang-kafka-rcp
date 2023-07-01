@@ -233,8 +233,6 @@ func (h *structKafka) ConsumerRpc(topic, groupId string, handler func(message ka
 }
 
 func (h *structKafka) DeleteTopicRpc(topic string) {
-	log.Println("DELETED TOPIC RPC: ", topic)
-
 	for _, v := range brokers {
 		broker, err := kafka.Dial(network, v)
 		if err != nil {
